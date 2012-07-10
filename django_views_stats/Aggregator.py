@@ -1,9 +1,21 @@
+import logging
+from time import time
+
 class ViewsStatsMiddleware(object):
     def __init__(self):
         self.view_map = {}
 
+    def _get_request_millis(self, request):
+        t2 = time()
+        t1 = request.__start_time
+        return (t2 - t1) * 1000
+
+    def _seed_request(self, request):
+        request.__start_time = time()
+
     def process_request(self, request):
-        print 'processing request'
+        self._seed_request(request)
+        logging.debug('processing request')
 
     def process_view(self, request, view_func, view_args, view_kwargs):
         request.__view = view_func
@@ -12,10 +24,10 @@ class ViewsStatsMiddleware(object):
         view_func = None
         try:
             view_func = request.__view
-            print 'processing response %s' % view_func
+            logging.debug('processing response %s',view_func)
         except AttributeError:
             view_func = unknown
-            print 'aieee, no view for you'
+            logging.debug('aieee, no view for you')
 
         if(view_func in self.view_map):
             counter = self.view_map[view_func]
@@ -23,11 +35,11 @@ class ViewsStatsMiddleware(object):
             counter = HttpStatusCounter()
             self.view_map[view_func] = counter
         
-        counter.record_request(response.status_code, 1) #TODO: real time taken
+        elapsed = self._get_request_millis(request)
+        counter.record_request(response.status_code, elapsed) #TODO: real time taken
         for k, v in self.view_map.iteritems():
-            print "%s => %s" % (k, v)
+            logging.debug("%s => %s", k, v)
         return response
-
 
 def unknown():
     pass
